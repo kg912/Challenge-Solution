@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"strings"
 
@@ -10,13 +11,20 @@ import (
 	"github.com/google/go-github/github"
 )
 
+/*
+	[DONE] remove pre-release versions
+	add test-cases
+	[DONE] don't hardcode pathname
+	support pagination
+*/
+
 // LatestVersions returns a sorted slice with the highest version as its first element and the highest version of the smaller minor versions in a descending order
 func LatestVersions(releases []*semver.Version, minVersion *semver.Version) []*semver.Version {
 	var tempSlice semVerSlice
 	var versionSlice semVerSlice
 	// This is just an example structure of the code, if you implement this interface, the test cases in main_test.go are very easy to run
 	for _, ver := range releases {
-		if ver.LessThan(*minVersion) || ver.Equal(*minVersion) {
+		if ver.LessThan(*minVersion) || ver.Equal(*minVersion) || ver.PreRelease != "" {
 			continue
 		} else {
 			tempSlice = append(tempSlice, ver)
@@ -48,14 +56,24 @@ func LatestVersions(releases []*semver.Version, minVersion *semver.Version) []*s
 // Please use the format defined by the fmt.Printf line at the bottom, as we will define a passing coding challenge as one that outputs
 // the correct information, including this line
 func main() {
-	fmt.Printf("\n\nlatest versions of kubernetes/kubernetes: %s\n", fetchReleases("kubernetes", "1.8.0"))
-	fmt.Printf("latest versions of prometheus/prometheus: %s\n\n", fetchReleases("prometheus", "2.2.0"))
+	b, err := ioutil.ReadFile("input.txt") // just pass the file name
+	if err != nil {
+		fmt.Print(err)
+	}
+	data := strings.Split(string(b), "\n")[1:]
+
+	for i := range data {
+		fileSlice := strings.Split(data[i], ",")
+		fmt.Printf("latest versions of %s: %s\n", fileSlice[0], fetchReleases(fileSlice[0], fileSlice[1]))
+	}
+
 }
-func fetchReleases(service string, minVersion string) []*semver.Version {
+func fetchReleases(pathName string, minVersion string) []*semver.Version {
+	path := strings.Split(pathName, "/")
 	client := github.NewClient(nil)
 	ctx := context.Background()
 	opt := &github.ListOptions{PerPage: 10}
-	releases, _, err := client.Repositories.ListReleases(ctx, service, service, opt)
+	releases, _, err := client.Repositories.ListReleases(ctx, path[0], path[1], opt)
 	if err != nil {
 		fmt.Printf("Request failed with error: %s\n", err)
 		os.Exit(1)
@@ -88,4 +106,12 @@ func (vSlice semVerSlice) sort() {
 			}
 		}
 	}
+}
+
+type ListOptions struct {
+	// For paginated result sets, page of results to retrieve.
+	Page int `url:"page,omitempty"`
+
+	// For paginated result sets, the number of results to include per page.
+	PerPage int `url:"per_page,omitempty"`
 }
